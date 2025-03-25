@@ -1,4 +1,5 @@
 import uvicorn
+
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
@@ -6,7 +7,7 @@ from motor.motor_asyncio import AsyncIOMotorClient
 from beanie import init_beanie
 
 # Import routers from src package
-from src import articles, messages, users, posts, chat, councilor
+from src import articles, messages, users, posts, chat, councilor, auth
 
 from utils.websocket import WebsocketConnectionManager
 
@@ -100,6 +101,7 @@ app.include_router(users.router)
 app.include_router(posts.router)
 app.include_router(chat.router)
 app.include_router(councilor.router)
+app.include_router(auth.router)
 
 if __name__ == "__main__":
-    uvicorn.run("main:app", host="127.0.0.1", port=8000, reload=True)
+    uvicorn.run("main:app", reload=True)

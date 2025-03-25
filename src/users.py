@@ -14,6 +14,8 @@ from pydantic import ValidationError, Field
 from schemas.users import Users
 from models.request.users import NewUser
 
+from security.helpers import get_password_hash
+
 
 router = APIRouter(
     prefix='/api/v1/users',
@@ -31,17 +33,24 @@ async def create_user(request: NewUser) -> JSONResponse:
     Returns:
         JSONResponse: The response body
     """
+    addictions = [addiction.value for addiction in request.addictions]
+    
     new_user = Users(
         username=request.username,
         email=request.email,
         f_name=request.f_name,
         l_name=request.l_name,
         date_of_birth=request.date_of_birth.model_dump(),
-        addictions=request.addictions,
+        addictions=addictions,
+        permissions=["user", "me"],
+        password=get_password_hash(request.password)
     )
     
     response = await new_user.save()
     return JSONResponse(
-        content=response.id,
+        content={
+            "message": "Account created successfully",
+            "data": response.model_dump(exclude=["permissions", "password"])
+        },
         status_code=status.HTTP_201_CREATED
     )

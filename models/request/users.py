@@ -1,11 +1,18 @@
-import re
+import re, enum
 
 from fastapi.exceptions import HTTPException
 from fastapi import status
 
-from pydantic import Field, BaseModel, field_validator, model_validator
+from pydantic import Field, BaseModel, field_validator, model_validator, EmailStr
 from typing import Literal, Annotated, Self
 
+class AddictionEnum(enum.Enum):
+    ALCOHOL = "alcohol"
+    MARIJUANA = "marijuana"
+    PRESCRIPTION_DRUGS = "prescription-drugs"
+    COCAINE = "cocaine"
+    EXPLICIT_CONTENT = "explicit-content"
+    TOBACCO_AND_NICOTINE = "tobacco-and-nicotine"
 
 class Date_Of_Birth(BaseModel):
     day: int = Field(..., title="Day")
@@ -14,17 +21,11 @@ class Date_Of_Birth(BaseModel):
 
 class NewUser(BaseModel):
     username: str = Field(..., title="Username")
-    email: str = Field(..., title="Email")
+    email: EmailStr = Field(..., title="Email")
     f_name: str = Field(..., title="First Name")
     l_name: str = Field(..., title="Last Name")
     addictions: Annotated[
-        Literal[
-            "alcohol",
-            "marijuana",
-            "cocain",
-            "prescription-drugs",
-            "tobacco-and-nicotine",
-            "explicit-content"],
+        list[AddictionEnum],
         Field(..., title="Addictions")
     ] = Field(["alcohol","marijuana", "cocain", "prescription-drugs", "tobacco-and-nicotine", "explicit-content"], title="Addictions")
     date_of_birth: Date_Of_Birth = Field(..., title="Date of Birth")
@@ -71,20 +72,25 @@ class NewUser(BaseModel):
                 detail="Passwords do not match"
             )
         return self
+    
+    # Convert addiction strings to AddictionEnum values
+    @field_validator("addictions", mode="before")
+    @classmethod
+    def validate_addictions(cls, v):
+        if isinstance(v, list):
+            return [AddictionEnum(a) for a in v]  # Convert strings to enum
+        return v
         
     # * Check if first name and last name in password
     @model_validator(mode='after')
     def check_first_name_last_name_in_password(self) -> Self:
-        first_name = self.first_name
-        last_name = self.last_name
-        password = self.password
 
-        if first_name in password:
+        if self.f_name in self.password:
             raise HTTPException(
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
                 detail="Password contains first name"
             )
-        if last_name in password:
+        if self.l_name in self.password:
             raise HTTPException(
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
                 detail="Password contains last name"

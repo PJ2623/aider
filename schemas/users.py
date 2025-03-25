@@ -1,8 +1,9 @@
+import enum
+
 from beanie import Document, PydanticObjectId
 
 from typing import Annotated, Literal
 from pydantic import Field, field_serializer, BaseModel
-
 
 class Date_Of_Birth(BaseModel):
     day: int = Field(..., title="Day")
@@ -16,10 +17,13 @@ class Users(Document):
     l_name: str = Field(..., title="Last Name")
     notifications: list[Annotated[PydanticObjectId, Field(..., title="Notification ID")]] = Field([], title="Notifications")
     posts: list[Annotated[PydanticObjectId, Field(..., title="Post ID")]] = Field([], title="Posts")
-    addictions: list[Annotated[str, Field(..., title="Addiction ID")]] = Field([], title="Addictions")
+    addictions: list[Annotated[str, Field(..., title="Addiction ID")]]
     date_of_birth: Date_Of_Birth = Field(..., title="Date of Birth")
     g_chats: list[Annotated[PydanticObjectId, Field(..., title="Group Chat ID")]] = Field([], title="Group Chats")
     c_chats: list[Annotated[PydanticObjectId, Field(..., title="Councilor Chat ID")]] = Field([], title="Councilor Chats")
+    permissions: list[Annotated[str, Field(..., title="Permission")]]
+    password: str = Field(..., title="Password")
+    active: bool = Field(True, title="Active")
         
     @field_serializer("id")
     def convert_pydantic_object_id_to_string(self, id:PydanticObjectId) -> str:
