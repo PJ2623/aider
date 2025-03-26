@@ -3,12 +3,14 @@ from bson.errors import InvalidId
 from datetime import datetime
 
 from beanie import PydanticObjectId
-from beanie.operators import Push
+from beanie.operators import Push, In
 
 from fastapi import APIRouter, Security, status, HTTPException, Query
 from fastapi.responses import JSONResponse
 
 from typing import Annotated
+
+from schemas.posts import Posts
 
 from security.helpers import get_current_active_user
 
@@ -52,5 +54,20 @@ async def create_post(request: NewPost, current_user: Annotated[Users, Security(
         content={
             "message": "Post created successfully",
             "data": new_post.model_dump()
+        }
+    )
+    
+    
+@router.get("")
+async def get_posts(tags: list = []):
+    all_posts = await  Posts.find(
+        In(Posts.tags, tags)
+    ).to_list()
+    
+    return JSONResponse(
+        status_code=status.HTTP_200_OK,
+        content={
+            "status": "success",
+            "data": [post.model_dump() for post in all_posts]
         }
     )

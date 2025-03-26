@@ -14,7 +14,9 @@ from pydantic import ValidationError, Field
 from models.request.councilor import NewCouncilor
 from schemas.councilor import Councilor
 
-from security.helpers import get_password_hash
+from schemas.users import Users
+
+from security.helpers import get_password_hash, get_current_active_user
 
 router = APIRouter(
     prefix='/api/v1/councilor',
@@ -44,3 +46,20 @@ async def create_councilor(request: NewCouncilor):
             "data": response.model_dump(exclude=["password", "permissions"])
         }
     )
+    
+
+@router.get("")
+async def get_councilors(current_user: Annotated[Users, Security(get_current_active_user, scopes=["user"])]):
+    #* Retrieve all councilors
+    
+    councilors_in_db = await Councilor.find_all().to_list()
+    councilors = [councilor.model_dump(exclude=["password", "permissions"]) for councilor in councilors_in_db]
+    
+    return JSONResponse(
+        status_code=status.HTTP_200_OK,
+        content={
+            "status": "success",
+            "data": councilors
+        }
+    )
+    

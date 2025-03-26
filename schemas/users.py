@@ -19,8 +19,7 @@ class Users(Document):
     posts: list[Annotated[PydanticObjectId, Field(..., title="Post ID")]] = Field([], title="Posts")
     addictions: list[Annotated[str, Field(..., title="Addiction ID")]]
     date_of_birth: Date_Of_Birth = Field(..., title="Date of Birth")
-    g_chats: list[Annotated[PydanticObjectId, Field(..., title="Group Chat ID")]] = Field([], title="Group Chats")
-    c_chats: list[Annotated[PydanticObjectId, Field(..., title="Councilor Chat ID")]] = Field([], title="Councilor Chats")
+    chats: list[Annotated[PydanticObjectId, Field(..., title="ID of the user a user is talking to")]] = Field([], title="Chats")
     permissions: list[Annotated[str, Field(..., title="Permission")]]
     password: str = Field(..., title="Password")
     active: bool = Field(True, title="Active")
