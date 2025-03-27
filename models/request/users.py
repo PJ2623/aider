@@ -31,6 +31,7 @@ class NewUser(BaseModel):
     date_of_birth: Date_Of_Birth = Field(..., title="Date of Birth")
     password: str = Field(..., title="Password")
     confirm_password: str = Field(..., title="Confirm Password")
+    account_type: Literal["user", "group"] = Field("user", title="Account Type")
     
 
     # * Validate the password to ensure it has at least one uppercase letter,

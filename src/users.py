@@ -43,7 +43,8 @@ async def create_user(request: NewUser) -> JSONResponse:
         date_of_birth=request.date_of_birth.model_dump(),
         addictions=addictions,
         permissions=["user", "me"],
-        password=get_password_hash(request.password)
+        password=get_password_hash(request.password),
+        account_type=request.account_type
     )
     
     response = await new_user.save()

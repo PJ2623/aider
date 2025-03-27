@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>WebSocket Tester</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background-color: #f0f0f0;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .panel {
+            border: 1px solid #ddd;
+            padding: 20px;
+            margin: 10px 0;
+            border-radius: 4px;
+        }
+        input {
+            padding: 8px;
+            margin: 5px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            width: 200px;
+        }
+        button {
+            padding: 8px 16px;
+            margin: 5px;
+            background: #007bff;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        button:disabled {
+            background: #6c757d;
+            cursor: not-allowed;
+        }
+        #messages {
+            height: 300px;
+            overflow-y: auto;
+            border: 1px solid #ddd;
+            padding: 10px;
+            margin: 10px 0;
+            background: #f8f9fa;
+        }
+        .message {
+            margin: 5px 0;
+            padding: 8px;
+            border-radius: 4px;
+        }
+        .sent { background: #e3f2fd; color: #1976d2; }
+        .received { background: #e8f5e9; color: #2e7d32; }
+        .error { background: #ffebee; color: #c62828; }
+        .status { color: #6c757d; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>WebSocket Tester</h1>
+        
+        <div class="panel">
+            <h3>Connection</h3>
+            <input type="text" id="userId" placeholder="Enter User ID">
+            <button onclick="connect()" id="connectBtn">Connect</button>
+            <span id="status">Status: Disconnected</span>
+        </div>
+
+        <div class="panel">
+            <h3>Send Message</h3>
+            <input type="text" id="recipient" placeholder="Recipient/Group" disabled>
+            <input type="text" id="message" placeholder="Message text" disabled>
+            <button onclick="sendMessage()" id="sendBtn" disabled>Send Message</button>
+        </div>
+
+        <div class="panel">
+            <h3>Message Log</h3>
+            <div id="messages"></div>
+        </div>
+    </div>
+
+    <script>
+        let ws = null;
+        const connectBtn = document.getElementById('connectBtn');
+        const sendBtn = document.getElementById('sendBtn');
+        const userIdInput = document.getElementById('userId');
+        const recipientInput = document.getElementById('recipient');
+        const messageInput = document.getElementById('message');
+        const statusSpan = document.getElementById('status');
+        const messagesDiv = document.getElementById('messages');
+
+        function updateUIState(connected) {
+            recipientInput.disabled = !connected;
+            messageInput.disabled = !connected;
+            sendBtn.disabled = !connected;
+            connectBtn.textContent = connected ? 'Disconnect' : 'Connect';
+            statusSpan.textContent = `Status: ${connected ? 'Connected' : 'Disconnected'}`;
+        }
+
+        function connect() {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.close();
+                return;
+            }
+
+            const userId = userIdInput.value.trim();
+            if (!userId) {
+                alert('Please enter a User ID');
+                return;
+            }
+
+            ws = new WebSocket('ws://192.168.64.1:8000/api/v1/chat/ws');
+
+            ws.onopen = () => {
+                ws.send(JSON.stringify({ user_id: userId }));
+                updateUIState(true);
+                addMessage('Connection established', 'status');
+            };
+
+            ws.onmessage = (event) => {
+                try {
+                    const data = JSON.parse(event.data);
+                    addMessage(`Received: ${JSON.stringify(data)}`, 'received');
+                } catch (e) {
+                    addMessage(`Invalid JSON: ${event.data}`, 'error');
+                }
+            };
+
+            ws.onerror = (error) => {
+                addMessage(`Connection error: ${error}`, 'error');
+                updateUIState(false);
+            };
+
+            ws.onclose = () => {
+                addMessage('Connection closed', 'status');
+                updateUIState(false);
+            };
+        }
+
+        function sendMessage() {
+            const recipient = recipientInput.value.trim();
+            const message = messageInput.value.trim();
+            
+            if (!recipient || !message) {
+                alert('Both fields are required');
+                return;
+            }
+
+            const payload = {
+                recipient: recipient,
+                message: message
+            };
+
+            try {
+                ws.send(JSON.stringify(payload));
+                addMessage(`Sent: ${JSON.stringify(payload)}`, 'sent');
+                messageInput.value = '';
+            } catch (e) {
+                addMessage(`Send failed: ${e}`, 'error');
+            }
+        }
+
+        function addMessage(text, type) {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${type}`;
+            messageDiv.innerHTML = `
+                <small>${new Date().toLocaleTimeString()}</small><br>
+                ${text}
+            `;
+            messagesDiv.appendChild(messageDiv);
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+        }
+    </script>
+</body>
+</html>

@@ -11,7 +11,7 @@ from fastapi.responses import JSONResponse
 from typing import Annotated, Literal
 from pydantic import ValidationError, Field
 
-
+from schemas.articles import Articles
 
 router = APIRouter(
     prefix='/api/v1/articles',

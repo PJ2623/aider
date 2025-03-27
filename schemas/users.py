@@ -23,6 +23,7 @@ class Users(Document):
     permissions: list[Annotated[str, Field(..., title="Permission")]]
     password: str = Field(..., title="Password")
     active: bool = Field(True, title="Active")
+    account_type: Literal["user", "group"] = Field("user", title="Account Type")
         
     @field_serializer("id")
     def convert_pydantic_object_id_to_string(self, id:PydanticObjectId) -> str:

@@ -1,11 +1,13 @@
+from pprint import pprint
 import uvicorn
+import json
 
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, status
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 from motor.motor_asyncio import AsyncIOMotorClient
-from beanie import init_beanie
-from beanie.operators import And
+from beanie import init_beanie, PydanticObjectId
+from beanie.operators import And, In, Push
 
 # Import routers from src package
 from src import articles, messages, users, posts, councilor, auth
@@ -163,43 +165,94 @@ app.add_middleware(
 async def get():
     return HTMLResponse(html)
 
+
 @app.websocket("/api/v1/chat/ws")
 async def chat_to_councilor_or_group(websocket: WebSocket):
     groups = ["explicit-quitters", "grass-quitters"]
-    await websocket.accept()  # *Accept the connection immediately
-    
-    #* Receive the initial JSON message with user_id
-    init_data: dict = await websocket.receive_json()
-    user_id = init_data.get("user_id")
-    
-    #* Register the WebSocket connection
-    await connection_manager.connect(user_id, websocket)
+    await websocket.accept()
 
     try:
-        #* Continuously listen for incoming messages
+        # Validate initial connection
+        init_data: dict = await websocket.receive_json()
+        user_id = init_data.get("user_id")
+        
+        if not user_id:
+            await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
+            return
+
+        await connection_manager.connect(user_id, websocket)
+        print(f"Active connections: {connection_manager.active_connections.keys()}")
+
         while True:
-            #* Receive the message
             data: dict = await websocket.receive_json()
             
-            #* Send a message meant for a group to all active users that have chatted with the group
-            for group in groups:
-                recipients = []
-                if group == data.get("recipient"):
-                    past_conversations = await message_schemas.Messages.find_all(
-                        message_schemas.Messages.recipient == group
-                    ).to_list()
-                    
-                    active_users = connection_manager.active_connections.keys()
-                    for user in active_users:
-                        for conversation in past_conversations:
-                            if conversation.sender == user:
-                                recipients.append(user)
-                
-                for recipient in recipients:
-                    await connection_manager.send_to_user(recipient, data)
+            # Validate connection status
+            if user_id not in connection_manager.active_connections:
+                await websocket.close()
+                break
 
-    except WebSocketDisconnect:
-        connection_manager.disconnect(user_id)
+            # Force sender to be authenticated user
+            data["sender"] = user_id
+            recipient = data.get("recipient")
+
+            if recipient in groups:
+                # Group message logic
+                past_conversations = await message_schemas.Messages.find_many(
+                    message_schemas.Messages.recipient == recipient
+                ).to_list()
+                
+                active_users = set(connection_manager.active_connections.keys())
+                past_participants = {conv.sender for conv in past_conversations}
+                recipients = active_users & past_participants
+
+                print(f"Sending to group {recipient}, recipients: {recipients}")
+                for user in recipients:
+                    await connection_manager.send_to_user(user, data)
+                    
+                # Save message to database
+                new_message = await message_schemas.Messages(
+                    sender=user_id,
+                    recipient=recipient,
+                    content=data.get("message")
+                ).insert()
+                
+                # Add message ID to group's chats list
+                group_in_db = await user_schemas.Users.find_one(
+                    In(user_schemas.Users.username, groups),
+                )
+                await group_in_db.update(Push({user_schemas.Users.chats: new_message.id}))
+                await group_in_db.save()
+            else:
+                # Individual message logic
+                target_user = recipient
+                print(f"Attempting to send to individual: {target_user}")
+                
+                if target_user in connection_manager.active_connections:
+                    print(f"Sending to {target_user}: {data}")
+                    await connection_manager.send_to_user(target_user, data)
+                else:
+                    print(f"Target user {target_user} not connected")
+                    # Optionally notify sender about failed delivery
+                    await connection_manager.send_to_user(user_id, {
+                        "status": "error",
+                        "message": f"Recipient {target_user} is not connected"
+                    })
+                    
+                # Save message to database
+                new_message = await message_schemas.Messages(
+                    sender=user_id,
+                    recipient=recipient,
+                    content=data.get("message")
+                ).insert()
+                
+                user_in_db = await user_schemas.Users.find_one(
+                    user_schemas.Users.id == PydanticObjectId(user_id)
+                )
+                await user_in_db.update(Push({user_schemas.Users.chats: new_message.id}))
+                await user_in_db.save()
+
+    except (WebSocketDisconnect, json.JSONDecodeError) as e:
+        print(f"WebSocket error: {str(e)}")
         
         
 @app.websocket("/api/v1/chat/g/ws")
@@ -239,4 +292,4 @@ app.include_router(councilor.router)
 app.include_router(auth.router)
 
 if __name__ == "__main__":
-    uvicorn.run("main:app", reload=True, host="192.168.64.1")
+    uvicorn.run("main:app", reload=True, host="0.0.0.0")

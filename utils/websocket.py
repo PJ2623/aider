@@ -12,6 +12,8 @@ class WebsocketConnectionManager:
 
     async def connect(self, user_id: str, websocket: WebSocket):
         self.active_connections[user_id] = websocket
+        
+        print(f"Active connections: {self.active_connections.keys()}")
 
     async def disconnect(self, user_id: str):
         """Disconnect and remove a user's WebSocket connection"""
